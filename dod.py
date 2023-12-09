@@ -47,7 +47,7 @@ transform_test=transforms.Compose([
                              [0.229, 0.224, 0.225])
 ])
 
-dataset0=datasets.ImageFolder(root="/home/mariya/Рабочий стол/BMSTU/кафедра/DOD/gender_rev2/train",transform=None)
+dataset0=datasets.ImageFolder(root="gender/train",transform=None)
 
 class_names=dataset0.classes
 print(class_names)
@@ -58,9 +58,9 @@ class DataModule(pl.LightningDataModule):
     
     def __init__(self, transform=transform, batch_size=32):
         super().__init__()
-        self.train_dir = "/home/mariya/Рабочий стол/BMSTU/кафедра/DOD/gender_rev2/train"
-        self.val_dir = "/home/mariya/Рабочий стол/BMSTU/кафедра/DOD/gender_rev2/valid"
-        self.test_dir = "/home/mariya/Рабочий стол/BMSTU/кафедра/DOD/gender_rev2/test"
+        self.train_dir = "gender/train"
+        self.val_dir = "gender/valid"
+        self.test_dir = "gender/test"
         self.transform = transform
         self.batch_size = batch_size
 
