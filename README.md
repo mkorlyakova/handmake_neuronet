@@ -15,6 +15,7 @@
 pip install -r requerements.txt
 
 множество примеров для обучения :
+раскрыть архив gender.zip
 /gender/train/femile
 /gender/train/maile
 
