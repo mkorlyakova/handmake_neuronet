@@ -2,6 +2,7 @@ import os
 import random
 import numpy as np
 import pandas as pd
+import time
 # from tqdm import tqdm
 import torch
 print(torch.__version__)
@@ -25,10 +26,12 @@ from sklearn.metrics import classification_report
 from PIL import Image
 
 from facenet_pytorch import MTCNN
+
+# детектор - предобучен
 IMAGE_SIZE = [224, 224]
 detector = MTCNN(image_size=IMAGE_SIZE, margin=0, min_face_size=40, thresholds=[0.8, 0.7, 0.8])
 
-
+# преобразователи картинки
 transform=transforms.Compose([
         transforms.RandomRotation(10),      # rotate +/- 10 degrees
         transforms.RandomHorizontalFlip(),  # reverse 50% of images
@@ -47,13 +50,16 @@ transform_test=transforms.Compose([
                              [0.229, 0.224, 0.225])
 ])
 
+# датасет для обучения
 dataset0=datasets.ImageFolder(root="gender/train",transform=None)
-
+# имена классов
 class_names=dataset0.classes
 print(class_names)
 print(len(class_names))
+
 s = input('готовы учить (д/н):')
 
+# чтение данных
 class DataModule(pl.LightningDataModule):
     
     def __init__(self, transform=transform, batch_size=32):
@@ -82,12 +88,12 @@ class DataModule(pl.LightningDataModule):
     def test_dataloader(self):
         return self.test_dataset
 
-    
+#  нейронка
 class ConvolutionalNetwork(LightningModule):
     
     def __init__(self):
         super(ConvolutionalNetwork, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 3, 1)
+        self.conv1 = nn.Conv2d(3, 6, 3, 1) 
         self.conv2 = nn.Conv2d(6, 16, 3, 1)
         self.fc1 = nn.Linear(16 * 54 * 54, 120)
         self.fc2 = nn.Linear(120, 84)
@@ -138,37 +144,25 @@ class ConvolutionalNetwork(LightningModule):
         self.log("test_loss", loss)
         self.log("test_acc", acc)    
 
-        
+# Обучение сети        
 if s=='д':
     
     datamodule = DataModule()
     datamodule.setup()
     model = ConvolutionalNetwork()
-    trainer = pl.Trainer(max_epochs=5)
-    trainer.fit(model, datamodule) 
+    trainer = pl.Trainer(max_epochs=15) # создание обучалки
+    trainer.fit(model, datamodule) # обучаем
     
     datamodule.setup(stage='test')
-    test_loader = datamodule.test_dataloader()
+    test_loader = datamodule.test_dataloader() #  тестируем
     trainer.test(dataloaders=test_loader)    
 
-    m = torch.jit.script(model)
+    
 
     # Сохранить в файл
+    m = torch.jit.script(model)
     torch.jit.save(m, 'scriptmodule.pt')
 
-    for images, labels in datamodule.train_dataloader():
-        break
-    im=make_grid(images,nrow=16)
-
-    plt.figure(figsize=(12,12))
-    plt.imshow(np.transpose(im.numpy(),(1,2,0)))
-
-    inv_normalize=transforms.Normalize(mean=[-0.485/0.229,-0.456/0.224,-0.406/0.225],
-                                       std=[1/0.229,1/0.224,1/0.225])
-    im=inv_normalize(im)
-
-    plt.figure(figsize=(12,12))
-    plt.imshow(np.transpose(im.numpy(),(1,2,0)))
 
 s = input('готовы работать (д/н): ')    
 
@@ -180,24 +174,17 @@ if s == 'д':
 
         device = torch.device("cpu")   #"cuda:0"
 
-        model.eval()
-        # y_true=[]
-        # y_pred=[]
-        # with torch.no_grad():
-        #     for test_data in datamodule.test_dataloader():
-        #         test_images, test_labels = test_data[0].to(device), test_data[1].to(device)
-        #         pred = model(test_images).argmax(dim=1)
-        #         for i in range(len(pred)):
-        #             y_true.append(test_labels[i].item())
-        #             y_pred.append(pred[i].item())
-
-
+        model.eval() # исполнение модели
+        # для вывода результата
         import cv2 
 
+        font = cv2.FONT_HERSHEY_SIMPLEX 
+         
+        fontScale = 1
+        color = (255, 0, 0) 
 
+        thickness = 2
 
-
-        # define a video capture object 
         vid = cv2.VideoCapture(0) 
 
         while(True): 
@@ -210,15 +197,20 @@ if s == 'д':
                 
                 try:
                     print(image.size)
-                    boxes, probs, landmarks = detector.detect(image, landmarks=True)
+                    boxes, probs, landmarks = detector.detect(image, landmarks=True) # детектор
                     print('detect', boxes)
                     e = ''
                     for box in boxes:
                         x1, y1, x2, y2 = np.array(boxes[0]).astype(int)
                         img = transform_test(image.crop([x1,y1,x2,y2]))
-                        pred = model(img).argmax(dim=1).int()
+                        yp = model(img)# работа модели
+                        pred = (yp[0,0]>yp.mean()*0.5).int() # получаем решение
+                        print(yp[0, :], pred)
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1, cv2.LINE_AA)
+                        org = (x1, y1)
+                        frame = cv2.putText(frame, str(class_names[pred]), org, font, fontScale, color, thickness, cv2.LINE_AA)
+                        
                         print(pred)
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1, cv2.LINE_AA) 
                         e += str(class_names[pred]) + ' : '
                 except:
                     e = 'no Face'
@@ -228,17 +220,10 @@ if s == 'д':
                     x1, y1, x2, y2 = np.array(boxes[0]).astype(int)
                 except:
                     print(image.size)
-                    
-                
-                
-
-                
-                # Display the resulting frame 
+                time.sleep(0.1)
+                # Display frame 
                 cv2.imshow('frame :'+ e, frame) 
 
-                # the 'q' button is set as the 
-                # quitting button you may use any 
-                # desired button of your choice 
                 if cv2.waitKey(1) & 0xFF == ord('q'): 
                     break
 
