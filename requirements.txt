@@ -1,0 +1,13 @@
+Cython==3.0.6
+facenet_pytorch==2.5.2
+matplotlib==3.6.3
+numpy==1.23.5
+opencv_python==4.8.1.78
+pandas==2.0.3
+Pillow==10.1.0
+protobuf==4.25.1
+pyOpenSSL==23.3.0
+pytorch_lightning==2.1.2
+scikit_learn==1.3.2
+torch==2.1.1+cpu
+torchvision==0.16.1+cpu
